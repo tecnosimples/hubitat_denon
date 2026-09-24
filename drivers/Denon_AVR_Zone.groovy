@@ -25,10 +25,11 @@ metadata {
         capability "Actuator"
 
         // Comandos customizados com descrição
-        command "setVolume", [[name: "volume*", type: "NUMBER", description: "Volume em dB (-80 a +18 dB, ex: -40 para -40 dB). Se digitar 40, será interpretado como -40 dB."]]
+        command "setVolume", [[name: "volume*", type: "NUMBER", description: "Volume direto 0 a 100 (ex: 56) OU em dB negativo (ex: -24 para -24 dB)"]]
 
         // Atributos de estado da zona
         attribute "rawVolume", "string"
+        attribute "volumeDb", "string"
         attribute "zoneNumber", "number"
     }
 
@@ -123,7 +124,7 @@ def parseZoneEvent(String attrName, Object attrValue, String desc) {
     logDebug "Evento recebido do Pai: ${attrName} = ${attrValue}"
     Map eventMap = [name: attrName, value: attrValue]
     if (attrName == "volume") {
-        eventMap.unit = "dB"
+        eventMap.unit = "%"
     }
     if (desc) {
         eventMap.descriptionText = desc

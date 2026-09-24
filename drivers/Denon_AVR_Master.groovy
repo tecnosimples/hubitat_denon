@@ -26,7 +26,7 @@ metadata {
         capability "Actuator"
 
         // Comandos customizados do Main Zone e Sistema
-        command "setVolume", [[name: "volume*", type: "NUMBER", description: "Volume em dB (-80 a +18 dB, ex: -40 para -40 dB). Se digitar 40, será interpretado como -40 dB."]]
+        command "setVolume", [[name: "volume*", type: "NUMBER", description: "Volume direto 0 a 100 (ex: 56) OU em dB negativo (ex: -24 para -24 dB)"]]
         command "sendRawCommand", [[name: "command*", type: "STRING", description: "Comando bruto DCP (ex: PWON, ZMON, MVUP)"]]
         command "reconnect"
         command "disconnect"
@@ -37,13 +37,14 @@ metadata {
         attribute "networkStatus", "string"
         attribute "soundMode", "string"
         attribute "rawVolume", "string"
+        attribute "volumeDb", "string"
     }
 
     preferences {
         input name: "deviceIp", type: "text", title: "Endereço IP do Denon AVR", description: "Ex: 10.0.1.154", defaultValue: "10.0.1.154", required: true
         input name: "enableZone2", type: "bool", title: "Habilitar Zone 2", description: "Cria dispositivo filho para Zone 2", defaultValue: true
         input name: "enableZone3", type: "bool", title: "Habilitar Zone 3", description: "Cria dispositivo filho para Zone 3", defaultValue: true
-        input name: "maxVolumeDb", type: "number", title: "Limite de Volume Máximo Seguro (dB)", description: "Teto de segurança em dB (ex: 0 para 0.0 dB; -10 para -10.0 dB)", range: "-40..10", defaultValue: 0, required: true
+        input name: "maxVolumeLimit", type: "number", title: "Limite de Volume Máximo Seguro (0-98)", description: "Teto de segurança raw (80 = 0.0 dB referência; 90 = limite de fábrica)", range: "30..98", defaultValue: 80, required: true
         input name: "customInputs", type: "text", title: "Mapeamento de Entradas (Nome Amigável:Código Denon)", description: "Separe por vírgulas. Formato: Label:CODIGO", defaultValue: "TV:TV, Apple TV:MPLAY, Blu-ray:BD, Game:GAME, Cabo:SAT/CBL, Música:NET, Bluetooth:BT, Auxiliar:AUX1, CD:CD, Phono:PHONO, Tuner:TUNER", required: true
         input name: "logEnable", type: "bool", title: "Habilitar Log de Debug", defaultValue: true
         input name: "txtEnable", type: "bool", title: "Habilitar Log de Descrição/Eventos", defaultValue: true
@@ -192,8 +193,10 @@ def parse(String msg) {
         Double raw = parseRawVolume(volStr)
         if (raw != null) {
             Double db = rawToDb(raw)
+            int volLevel = Math.round(raw) as Integer
             sendEvent(name: "rawVolume", value: "${raw} (${db} dB)")
-            sendEvent(name: "volume", value: db, unit: "dB", descriptionText: "Main Volume: ${db} dB")
+            sendEvent(name: "volumeDb", value: "${db} dB")
+            sendEvent(name: "volume", value: volLevel, unit: "%", descriptionText: "Main Volume: ${volLevel} (${db} dB)")
         }
         return
     }
@@ -263,8 +266,10 @@ private void handleZoneMessage(int zoneNum, String subMsg) {
         Double raw = parseRawVolume(subMsg)
         if (raw != null) {
             Double db = rawToDb(raw)
+            int volLevel = Math.round(raw) as Integer
             notifyChildZone(zoneNum, "rawVolume", "${raw} (${db} dB)", null)
-            notifyChildZone(zoneNum, "volume", db, "Zone ${zoneNum} Volume: ${db} dB")
+            notifyChildZone(zoneNum, "volumeDb", "${db} dB", null)
+            notifyChildZone(zoneNum, "volume", volLevel, "Zone ${zoneNum} Volume: ${volLevel} (${db} dB)")
         }
         return
     }
@@ -324,9 +329,9 @@ def volumeDown() {
 }
 
 def setVolume(volumeLevel) {
-    String rawDenon = dbToRawDenon(volumeLevel)
+    String rawDenon = calculateRawDenon(volumeLevel)
     Double db = rawToDb(parseRawVolume(rawDenon))
-    logInfo "Ajustando volume da Main Zone para ${db} dB (raw: ${rawDenon})..."
+    logInfo "Ajustando volume da Main Zone para ${rawDenon} (${db} dB)..."
     sendDenonCommand("MV${rawDenon}")
 }
 
@@ -392,9 +397,9 @@ def sendZoneCommand(int zoneNum, String action) {
 }
 
 def setZoneVolume(int zoneNum, volumeLevel) {
-    String rawDenon = dbToRawDenon(volumeLevel)
+    String rawDenon = calculateRawDenon(volumeLevel)
     Double db = rawToDb(parseRawVolume(rawDenon))
-    logInfo "Ajustando volume da Zone ${zoneNum} para ${db} dB (raw: ${rawDenon})..."
+    logInfo "Ajustando volume da Zone ${zoneNum} para ${rawDenon} (${db} dB)..."
     sendDenonCommand("Z${zoneNum}${rawDenon}")
 }
 
@@ -498,27 +503,31 @@ Double rawToDb(Double raw) {
     return (raw - 80.0)
 }
 
-String dbToRawDenon(def inputVol) {
+String calculateRawDenon(def inputVol) {
     if (inputVol == null) return "00"
     double val = inputVol as Double
+    int raw
     
-    // Se digitou positivo acima de 18 (ex: 40 ou 50), interpreta como negativo (-40 ou -50 dB)
-    if (val > 18.0) {
-        val = -val
+    if (val < 0) {
+        // Valor negativo: interpreta como dB relativo (-80.0 a 0.0 dB)
+        // Ex: -24 -> -24 + 80 = 56
+        raw = Math.round(val + 80.0) as Integer
+    } else {
+        // Valor positivo ou zero: interpreta como nível direto (0 a 100)
+        // Ex: 56 -> 56
+        raw = Math.round(val) as Integer
     }
     
-    // Clamp físico entre -80.0 dB e +18.0 dB
-    val = Math.max(-80.0, Math.min(18.0, val))
+    // Clamp físico Denon (00 a 98)
+    raw = Math.max(0, Math.min(98, raw))
     
-    // Limite de segurança configurável (padrão 0.0 dB)
-    double safeMaxDb = (settings.maxVolumeDb != null) ? (settings.maxVolumeDb as Double) : 0.0
-    if (val > safeMaxDb) {
-        logWarn "Volume solicitado (${val} dB) ultrapassa o limite de segurança (${safeMaxDb} dB). Limitado a ${safeMaxDb} dB."
-        val = safeMaxDb
+    // Limite de segurança configurável (padrão 80 raw = 0.0 dB referência)
+    int safeMaxRaw = (settings.maxVolumeLimit != null) ? (settings.maxVolumeLimit as Integer) : 80
+    if (raw > safeMaxRaw) {
+        logWarn "Volume solicitado (${raw}) ultrapassa o limite de segurança (${safeMaxRaw} = ${safeMaxRaw - 80} dB). Limitado a ${safeMaxRaw}."
+        raw = safeMaxRaw
     }
     
-    // raw = dB + 80
-    int raw = Math.round(val + 80.0) as Integer
     return sprintf("%02d", raw)
 }
 
