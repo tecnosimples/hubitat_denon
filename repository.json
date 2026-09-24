@@ -1,0 +1,20 @@
+{
+  "author": "TecnoSimples Tecnologia LTDA",
+  "gitHubUrl": "https://github.com/tecnosimples/hubitat_denon",
+  "payPalUrl": "",
+  "packages": [
+    {
+      "name": "Denon AVR — Integração Hubitat",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/tecnosimples/hubitat_denon/main/packageManifest.json",
+      "description": "Controle local via rede (Telnet TCP:23) para Receivers Denon AVR no Hubitat Elevation com suporte a 3 Zonas, volume em dB e feedback em tempo real.",
+      "tags": [
+        "Denon",
+        "AVR",
+        "Audio",
+        "Local",
+        "Integrations"
+      ]
+    }
+  ]
+}

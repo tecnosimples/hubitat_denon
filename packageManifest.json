@@ -1,0 +1,26 @@
+{
+  "packageName": "Denon AVR — Integração Hubitat",
+  "author": "TecnoSimples Tecnologia LTDA",
+  "version": "1.0.0",
+  "minimumHEVersion": "2.3.0",
+  "dateReleased": "2026-09-24",
+  "licenseFile": "https://raw.githubusercontent.com/tecnosimples/hubitat_denon/main/LICENSE",
+  "documentationLink": "https://github.com/tecnosimples/hubitat_denon",
+  "communityLink": "https://community.hubitat.com",
+  "drivers": [
+    {
+      "id": "90167fce-c832-48e1-8781-286173b3c13c",
+      "name": "Denon AVR Master",
+      "namespace": "TecnoSimples",
+      "location": "https://raw.githubusercontent.com/tecnosimples/hubitat_denon/main/drivers/Denon_AVR_Master.groovy",
+      "required": true
+    },
+    {
+      "id": "c0579ef2-9f2f-40a1-83e9-3149a680a54b",
+      "name": "Denon AVR Zone Child",
+      "namespace": "TecnoSimples",
+      "location": "https://raw.githubusercontent.com/tecnosimples/hubitat_denon/main/drivers/Denon_AVR_Zone.groovy",
+      "required": true
+    }
+  ]
+}
