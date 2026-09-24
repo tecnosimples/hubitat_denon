@@ -2,6 +2,8 @@
 
 Pacote oficial TecnoSimples para controle local via rede (Telnet TCP:23) de Receivers **Denon / Marantz** compatíveis com o protocolo DCP (Denon Control Protocol).
 
+📖 **Guia Passo a Passo Completo:** Consulte o [GUIA_DE_INSTALACAO.md](GUIA_DE_INSTALACAO.md) para o roteiro detalhado com preparação física do receiver, configuração de rede, particularidades de zonas e exemplos práticos de automação.
+
 ## 🚀 Instalação via Hubitat Package Manager (HPM)
 
 1. No Hubitat Elevation, abra o app **Hubitat Package Manager (HPM)**.
